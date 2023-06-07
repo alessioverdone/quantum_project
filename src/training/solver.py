@@ -1,19 +1,23 @@
 from dataset.intel_scene_classification.dataset import Dataset
+import torch
+from torch.utils.data import DataLoader
+from torchvision import models
+from torch import nn
+import os
 
 
 class Solver():
-    def __init__(self, args ,**kwargs):
+    def __init__(self, args, **kwargs):
         # prepare a dataset
         self.train_data = Dataset(train=True,
                                   data_root=args.data_root,
                                   size=args.image_size)
 
-
         self.test_data = Dataset(train=False,
                                  data_root=args.data_root,
                                  size=args.image_size)
 
-        lengths = [int(0. 8 *len(self.train_data)), len(self.train_data) - int(0.8 * len(self.train_data))]
+        lengths = [int(0.8 * len(self.train_data)), len(self.train_data) - int(0.8 * len(self.train_data))]
         self.train_set, self.val_set = torch.utils.data.random_split(self.train_data,
                                                                      lengths,
                                                                      torch.Generator().manual_seed(42))
@@ -33,26 +37,23 @@ class Solver():
 
         # Defining the connection part between the classical network and the quantistic fully connected network
         num_ftrs = cnn_network.fc.in_features
-        cnn_network.fc = nn.Linear(num_ftrs, n_qubits).to(self.device)
-        clayer_1 = torch.nn.Linear(n_qubits, 6).to(self.device)
+        cnn_network.fc = nn.Linear(num_ftrs, args.n_qubits).to(self.device)
+        clayer_1 = torch.nn.Linear(args.n_qubits, 6).to(self.device)
         # clayer_2 = torch.nn.Linear(10,6).to(self.device)
 
         # Defining the quantum layer
         # Loading network to train/test. By default, the script load the pre-trained ResNet50
-        self.net = kwargs.get('net' ,models.resnet50(pretrained=True)).to(self.device)
+        self.net = kwargs.get('net', models.resnet50(pretrained=True)).to(self.device)
         print(f'You requested the training of: {self.net.__class__.__name__}')
         ########################################################################
 
-
         self.loss_fn = torch.nn.CrossEntropyLoss()
         self.optim = torch.optim.Adam(self.net.parameters()
-                                      ,lr=args.lr  )  # torch.optim.Adam(self.net.parameters(), lr=args.lr)
+                                      , lr=args.lr)  # torch.optim.Adam(self.net.parameters(), lr=args.lr)
         self.args = args
 
         if not os.path.exists(args.ckpt_dir):
             os.makedirs(args.ckpt_dir)
-
-
 
     def fit(self):
         args = self.args
@@ -60,7 +61,6 @@ class Solver():
         for epoch in range(args.max_epochs):
             self.net.train()
             for step, inputs in enumerate(self.train_loader):
-
 
                 images = inputs[0].to(self.device)
                 labels = inputs[1].to(self.device)
@@ -72,10 +72,9 @@ class Solver():
                 self.optim.step()
                 # train_acc = self.evaluate(self.train_data)
                 # test_acc = self.evaluate(self.test_data)
-                if (ste p +1) % args.print_every_minibatche s= =0:
+                if (step + 1) % args.print_every_minibatches == 0:
                     print("Epoch [{}/{}] Batch [{}/{}] Loss: {:.3f}".
-                          format(epoch + 1, args.max_epochs ,step, len(self.train_loader), loss.item()))
-
+                          format(epoch + 1, args.max_epochs, step, len(self.train_loader), loss.item()))
 
                 # print("Epoch [{}/{}] Loss: {:.3f} Train Acc: {:.3f}, Test Acc: {:.3f}".
                 #      format(epoch + 1, args.max_epochs, loss.item(), train_acc, test_acc))
@@ -91,8 +90,6 @@ class Solver():
 
             print("Epoch [{}/{}] Loss: {:.3f} Train Acc: {:.3f}, Test Acc: {:.3f}".
                   format(epoch + 1, args.max_epochs, loss.item(), train_acc, test_acc))
-
-
 
     def evaluate(self, data):
         args = self.args
@@ -117,7 +114,7 @@ class Solver():
 
         return num_correct / num_total
 
-    def load_network(self ,net):
+    def load_network(self, net):
         self.net = net
 
     def test(self):

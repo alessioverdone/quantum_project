@@ -1,4 +1,5 @@
 # Ignore heavy datasets
+checkpoints/
 data/
 
 # IntelliJ folder
